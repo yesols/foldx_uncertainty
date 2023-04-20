@@ -1,0 +1,200 @@
+---
+title: "Other models"
+author: "Yesol Sapozhnikov"
+date: "5/31/2022"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+## Description
+
+Apply the same steps to determine models for different combination of datasets (FoldX, or MD + FoldX) and sets of parameters (FoldX energy terms, biochemical/physical properties, MD-associated SD).
+
+Naming convention in manuscript:
+
+- Model 1: FoldX-only dataset with FoldX energy terms
+- Model 2: FoldX-only dataset with FoldX energy terms + biochem properties
+- Model 3: MD + FoldX dataset with FoldX energy terms
+- Model 4: MD + FoldX dataset with FoldX energy terms + biochem properties
+- Model 5: MD + FoldX dataset with FoldX energy terms + biochem properties + sd 
+
+Model 1 and 5 were done in the previous script. This one will train models 2-4.
+
+## Read in data, load packages
+
+```{r}
+library(tidyverse)
+library(leaps)
+source("functions.R")
+```
+
+```{r}
+# Full tables:
+fold <- read.csv("../outputs/table_full_f.csv")
+bind <- read.csv("../outputs/table_full_b.csv")
+fold_tr <- read.csv("../outputs/tr_table_full_f.csv")
+bind_tr <- read.csv("../outputs/tr_table_full_b.csv")
+
+# FoldX-only tables:
+foldx <- read.csv("../outputs/table_fxonly_f.csv")
+bindx <- read.csv("../outputs/table_fxonly_b.csv")
+foldx_tr <- read.csv("../outputs/tr_table_fxonly_f.csv")
+bindx_tr <- read.csv("../outputs/tr_table_fxonly_b.csv")
+```
+
+There were 3 rows in folding dataset that had no match for dssp data and removed from "fold" and "fold_tr." Remove these manually from "foldx" and "foldx_tr." (Run 01_generate-organized-tables.Rmd to get details on the missing rows.)
+```{r}
+foldx <- foldx[-c(449, 642, 643),]
+foldx_tr <- foldx_tr[-c(449, 642, 643),]
+```
+
+
+
+## Model 4: MD+FX dataset with FX energy terms, biochemical predictors
+
+Get models from stepwise selection and best subset for each dataset.
+```{r, include = FALSE}
+data_f <- fold_tr %>% select(-ends_with("sd"))
+data_b <- bind_tr %>% select(-ends_with("sd"))
+# stepwise selection
+mod4_step_f <- run_stepwise(data_f)
+mod4_step_b <- run_stepwise(data_b)
+# best subset
+mod4_subset_f <- run_subset(data_f)
+mod4_subset_b <- run_subset(data_b)
+```
+
+Cross validation.
+```{r}
+models <- list(fold_stepwise = mod4_step_f, fold_best_subset = mod4_subset_f,
+               bind_stepwise = mod4_step_b, bind_best_subset = mod4_subset_b)
+summary_tab <- data.frame(models = names(models))
+datasets_ls <- list(fold, fold, bind, bind)
+for (i in 1:length(models)){
+  summary_tab$adj_r2[i] <- summary(models[[i]])$adj.r.squared
+  out <- loocv(formula(models[[i]]), datasets_ls[[i]])
+  summary_tab$coverage[i] <- out$coverage
+  summary_tab$med_upr_bd[i] <- out$med_upr_bd
+}
+summary_tab
+```
+Best subset models are better in both cases.
+
+```{r}
+mod4_subset_f
+mod4_subset_b
+```
+
+
+
+
+## Model 3: MD+FX dataset with FX energy terms only
+
+Get models from stepwise selection and best subset for each dataset.
+```{r, include = FALSE}
+data_f <- fold_tr %>% select(backbone_vdwclash:error)
+data_b <- bind_tr %>% select(backbone_vdwclash:error)
+# stepwise selection
+mod3_step_f <- run_stepwise(data_f)
+mod3_step_b <- run_stepwise(data_b)
+# best subset
+mod3_subset_f <- run_subset(data_f)
+mod3_subset_b <- run_subset(data_b)
+```
+
+Cross validation.
+```{r}
+models <- list(fold_stepwise = mod3_step_f, fold_best_subset = mod3_subset_f,
+               bind_stepwise = mod3_step_b, bind_best_subset = mod3_subset_b)
+summary_tab <- data.frame(models = names(models))
+datasets_ls <- list(fold, fold, bind, bind)
+for (i in 1:length(models)){
+  summary_tab$adj_r2[i] <- summary(models[[i]])$adj.r.squared
+  out <- loocv(formula(models[[i]]), datasets_ls[[i]])
+  summary_tab$coverage[i] <- out$coverage
+  summary_tab$med_upr_bd[i] <- out$med_upr_bd
+}
+summary_tab
+
+```
+For folding, best subset model is better. For binding, both methods produced same models.
+```{r}
+mod3_subset_f
+mod3_subset_b
+```
+
+
+## Model 2: FX dataset with energy terms and biochemical predictors
+
+Get models from stepwise selection and best subset for each dataset.
+```{r, include = FALSE}
+data_f <- fold %>% 
+  select(P, volchange, HIchange, charge, str, RSA) %>%
+  bind_cols(., foldx_tr)
+data_b <- bind %>%
+  select(P, volchange, HIchange, charge, str, RSA) %>%
+  bind_cols(., bindx_tr)
+# stepwise selection
+mod2_step_f <- run_stepwise(data_f)
+mod2_step_b <- run_stepwise(data_b)
+# best subset
+mod2_subset_f <- run_subset(data_f)
+mod2_subset_b <- run_subset(data_b)
+```
+
+Cross validation.
+```{r}
+models <- list(fold_stepwise = mod2_step_f, fold_best_subset = mod2_subset_f,
+               bind_stepwise = mod2_step_b, bind_best_subset = mod2_subset_b)
+summary_tab <- data.frame(models = names(models))
+data_f <- fold %>% 
+  select(P, volchange, HIchange, charge, str, RSA) %>%
+  bind_cols(., foldx)
+data_b <- bind %>%
+  select(P, volchange, HIchange, charge, str, RSA) %>%
+  bind_cols(., bindx)
+datasets_ls <- list(data_f, data_f, data_b, data_b)
+for (i in 1:length(models)){
+  summary_tab$adj_r2[i] <- summary(models[[i]])$adj.r.squared
+  out <- loocv(formula(models[[i]]), datasets_ls[[i]])
+  summary_tab$coverage[i] <- out$coverage
+  summary_tab$med_upr_bd[i] <- out$med_upr_bd
+}
+summary_tab
+```
+For folding dataset, best subset model is slightly better in coverage. For binding, best subset clearly better.
+
+```{r}
+mod2_subset_f
+mod2_subset_b
+```
+
+
+
+Save all best models.
+```{r}
+mods <- readRDS("../outputs/models.rds") # because models 1 and 5 were saved here
+
+best_mods_all <- list(
+  mod1_fold = mods$mod_subset_fx, 
+  mod2_fold = mod2_subset_f, 
+  mod3_fold = mod3_subset_f, 
+  mod4_fold = mod4_subset_f, 
+  mod5_fold = mods$mod_subset_f, 
+  
+  mod1_bind = mods$mod_subset_bx,
+  mod2_bind = mod2_subset_b,
+  mod3_bind = mod3_subset_b,
+  mod4_bind = mod4_subset_b,
+  mod5_bind = mods$mod_subset_b
+)
+saveRDS(best_mods_all, "../outputs/best_mods_all.rds")
+```
+
+
+
+
+

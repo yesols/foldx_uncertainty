@@ -1,0 +1,105 @@
+---
+title: "Cross Validation"
+author: "Yesol Sapozhnikov"
+date: "3/4/2022"
+output: html_document
+---
+
+
+This script performs LOOCV to further select best-performing models from the results of 02_model-selection.R script. We use a modified leave-one-out nethod in which all data points from a system is left out instead of each data point. 
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+```{r}
+# load packages
+library(tidyverse)
+
+# Full tables:
+fold <- read.csv("../outputs/table_full_f.csv")
+bind <- read.csv("../outputs/table_full_b.csv")
+
+# FoldX-only tables:
+foldx <- read.csv("../outputs/table_fxonly_f.csv")
+foldx <- foldx[-c(449, 642, 643),] #to match with full table (3 muts removed d/t non-match with dssp)
+bindx <- read.csv("../outputs/table_fxonly_b.csv")
+
+# selected models from stepwise & best subset selection
+mods <- readRDS("../outputs/models.rds")
+
+# source LOsysOCV function
+source("../scripts/functions.R")
+```
+
+
+## Pick between stepwise and best subset selection
+
+```{r}
+# Create a summary table
+models <- names(mods)
+methods <- c(rep("stepwise", 4), rep("best subset", 4))
+datasets <-rep(c(rep("full", 2), rep("fx-only", 2)), 2)
+energy <- c(rep(c("folding", "binding"), 4))
+sum_table <- data.frame(models, methods, datasets, energy)
+
+# Compute each model through fn_loocv and collect metrics
+datasets_ls <- list(fold, bind, foldx, bindx, fold, bind, foldx, bindx)
+for (i in 1:length(mods)){
+  sum_table$adj_r2[i] <- summary(mods[[i]])$adj.r.squared
+  out <- loocv(formula(mods[[i]]), datasets_ls[[i]])
+  sum_table$coverage[i] <- out$coverage
+  sum_table$med_upr_bd[i] <- out$med_upr_bd
+}
+sum_table <- as_tibble(sum_table)
+sum_table
+```
+
+Folding energy dataset (full): Best subset
+Best subset has better adj_r2 with slight larger med_upr_bd. Probably a better choice in that the max outlier upr in best subset is less than that in stepwise.
+
+```{r}
+print(paste("stepwise terms:", as.character(formula(mods$mod_step_f))[3]))
+print(paste("best subset terms:", as.character(formula(mods$mod_subset_f))[3]))
+sum_table %>% filter(datasets == "full", energy == "folding") %>% 
+  select(methods, adj_r2, coverage, med_upr_bd)
+```
+
+
+Binding energy dataset (full): Best subset
+adj_r2 and med_upr_bd are very similar. Best subset is about 1 point better in coverage.
+
+```{r}
+print(paste("stepwise terms:", as.character(formula(mods$mod_step_b))[3]))
+print(paste("best subset terms:", as.character(formula(mods$mod_subset_b))[3]))
+sum_table %>% filter(datasets == "full", energy == "binding") %>% 
+  select(methods, adj_r2, coverage, med_upr_bd)
+```
+
+
+Folding energy dataset (fx-only): Best subset
+Both with terrible r2! Best subset slightly better on all three metrics.
+
+```{r}
+print(paste("stepwise terms:", as.character(formula(mods$mod_step_fx))[3]))
+print(paste("best subset terms:", as.character(formula(mods$mod_subset_fx))[3]))
+sum_table %>% filter(datasets == "fx-only", energy == "folding") %>% 
+  select(methods, adj_r2, coverage, med_upr_bd)
+```
+
+
+
+Binding energy dataset (fx-only): selected terms are identical in both methods. 
+
+```{r}
+print(paste("stepwise terms:", as.character(formula(mods$mod_step_bx))[3]))
+print(paste("best subset terms:", as.character(formula(mods$mod_subset_bx))[3]))
+sum_table %>% filter(datasets == "fx-only", energy == "binding") %>% 
+  select(methods, adj_r2, coverage, med_upr_bd)
+```
+
+
+
+
+
+

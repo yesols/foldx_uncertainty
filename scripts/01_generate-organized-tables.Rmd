@@ -1,0 +1,403 @@
+---
+title: "FoldX Error Model: Organize data into dataframes"
+author: "Yesol Sapozhnikov"
+date: "1/5/2022"
+output: 
+  html_document:
+    keep_md: TRUE
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+
+FoldX datasets from MD snapshots are in /data directory. These text files are read and organized into arrays for further manipulation and analysis.
+
+Input data location: 
+MD+FoldX datasets: data/fold_data/, data/bind_data/
+FoldX-only datasets: data/fold_xstal_data/, data/bind_xstal_data/
+*experimental ddg values in the original dataset files were incorrect. Corrected numbers are in data/binding_exp/
+DSSP outputs: data/dssp/
+
+Below chunk reads in the data text files and creates 
+```{r}
+path_f <- "../data/fold_data/"
+path_b <- "../data/bind_data/"
+dns_f <- sort(list.files(path_f))
+dns_b <- sort(list.files(path_b))
+fns_f <- list.files(paste(path_f, dns_f[1], sep = "")) #files in each sys dir are identical, so grab them from 1bni
+fns_b <- list.files(paste(path_b, dns_b[1], sep = ""))
+sys_names_f <- sapply(strsplit(dns_f, "_"), "[", 1)
+sys_names_b <- sapply(strsplit(dns_b, "_"), "[", 1)
+
+
+######## FOLD DATA ########
+
+# Read in ddg_exp.txt for sys names, muts, exp ddg values
+list_sys <- list()
+list_mut <- list()
+list_ddg_exp <- list()
+for (i in 1:length(dns_f)){
+  list_sys[[i]] <- read.table(paste(path_f, dns_f[i], "/ddg_exp.txt", sep = ""))[1]
+  list_mut[[i]] <- read.table(paste(path_f, dns_f[i], "/ddg_exp.txt", sep = ""))[2]
+  list_ddg_exp[[i]] <- read.table(paste(path_f, dns_f[i], "/ddg_exp.txt", sep = ""))[3]
+}
+sys <- tolower(unlist(list_sys))
+mut <- unlist(list_mut)
+ddg_exp <- unlist(list_ddg_exp)
+list_exp <- list("systems" = sys, "mut" = mut, "ddg_exp" = ddg_exp)
+fold <- as.data.frame(list_exp)
+# Get rest of the energy terms into the df
+col_names_f <- fns_f
+col_names_f <- sub("[.]txt", "", col_names_f)
+#col_names_f <- col_names_f[!(col_names_f %in% c("ddg_exp","mut","total"))] #If want to exclude total
+col_names_f <- col_names_f[!(col_names_f %in% c("ddg_exp","mut"))] #include total
+list_vals <- list()
+for (i in 1:length(col_names_f)){
+  vals_i <- list()
+  for (j in 1:length(dns_f)){
+    vals_i[[j]] <- read.table(paste(path_f,dns_f[j],"/",col_names_f[i],".txt",sep=""))[1]
+  }
+  list_vals[[col_names_f[i]]] <- unlist(vals_i)
+}
+# Combine into a single df
+fold <- cbind(fold, as.data.frame(list_vals))
+# Add "error" columne
+fold$error <- abs(fold$total-fold$ddg_exp)
+
+
+######## BIND DATA #########
+
+# Repeating the code with slight modification due to the slight different file str
+# e.g. ddg_exp.txt does not contain sys, mut info as in fold data
+systems <- list()
+for (i in 1:length(sys_names_b)){
+  systems <- append(systems,
+                    rep(sys_names_b[i],nrow(read.table(paste(path_b,"/",dns_b[i],"/mut.txt",sep="")))))
+}
+list_sys <- tolower(unlist(systems))
+# Do mut and ddg_exp for begibnning of the df:
+list_mut <- list()
+list_ddg_exp <- list()
+for (i in 1:length(dns_b)){
+  list_mut[[i]] <- read.table(paste(path_b,dns_b[i],"/mut.txt",sep=""))
+}
+
+# Numbers in ddg_exp.txt had to be corrected. Received as separate files. Read them in and add to the dataframe:
+path_exp_b <- "../data/binding_exp/"
+for (i in 1:length(dns_b)){
+  list_ddg_exp[[i]] <- read.table(paste(path_exp_b,sys_names_b[i],"/",sys_names_b[i],"_ddg_exp.txt",
+                                        sep = ""))}
+
+
+mut <- unlist(list_mut)
+ddg_exp <- unlist(list_ddg_exp)
+list_exp <- list("systems"=list_sys,"mut"=mut,"ddg_exp"=ddg_exp)
+bind <- as.data.frame(list_exp)
+
+# Get rest of the values into the df
+# first columns - values
+col_names_b <- fns_b
+col_names_b <- sub("[.]txt","",col_names_b)
+#col_names_b <- col_names_b[!(col_names_b %in% c("ddg_exp","mut","total"))] #If want to exclude total
+col_names_b <- col_names_b[!(col_names_b %in% c("ddg_exp","mut"))] #include total
+list_vals <- list()
+for (i in 1:length(col_names_b)){
+  vals_i <- list()
+  for (j in 1:length(dns_b)){
+    vals_i[[j]] <- read.table(paste(path_b,dns_b[j],"/",col_names_b[i],".txt",sep=""))[1]
+  }
+  list_vals[[col_names_b[i]]] <- unlist(vals_i)
+}
+# Combine into a single df
+bind <- cbind(bind, as.data.frame(list_vals))
+# Add "error" columne
+bind$error <- abs(bind$total-bind$ddg_exp)
+
+
+# Save sys, mut, ddg_exp columns for FoldX-only dataframes later:
+foldx <- fold[c("systems","mut","ddg_exp")]
+bindx <- bind[c("systems","mut","ddg_exp")]
+
+
+##### MD snapshots SD values #######
+
+# sd (second col of the data files) - Fold
+list_sd_f <- list()
+for (i in 1:length(col_names_f)){
+  sd_i <- list()
+  for (j in 1:length(dns_f)){
+    sd_i[[j]] <- read.table(paste(path_f, dns_f[j],"/",col_names_f[i],".txt",sep=""))[2]
+  }
+  list_sd_f[[paste(col_names_f[i],"_sd",sep="")]] <- unlist(sd_i)
+}
+fold <- cbind(fold, as.data.frame(list_sd_f))
+
+# Bind
+list_sd_b <- list()
+for (i in 1:length(col_names_b)){
+  sd_i <- list()
+  for (j in 1:length(dns_b)){
+    sd_i[[j]] <- read.table(paste(path_b, dns_b[j],"/",col_names_b[i],".txt",sep=""))[2]
+  }
+  list_sd_b[[paste(col_names_b[i],"_sd",sep="")]] <- unlist(sd_i)
+}
+bind <- cbind(bind, as.data.frame(list_sd_b))
+
+
+# Remove energy terms that are all zero
+zeroes_f <- vector()
+for (i in 3:length(colnames(fold))){
+  if (sum(fold[,i])==0){
+    zeroes_f <- c(zeroes_f, i)
+  }
+}
+fold <- fold[-zeroes_f]
+
+zeroes_b <- vector()
+for (i in 3:length(colnames(bind))){
+  if (sum(bind[,i])==0){
+    zeroes_b <- c(zeroes_b, i)
+  }
+}
+bind <- bind[-zeroes_b]
+
+
+###### Fill in FoldX-only data ######
+
+path_fx <- "../data/fold_xstal_data/"
+path_bx <- "../data/bind_xstal_data/"
+dns_fx <- sort(list.files(path_fx))
+dns_bx <- sort(list.files(path_bx))
+fns_fx <- list.files(paste(path_fx, dns_fx[1], sep=""))
+fns_bx <- list.files(paste(path_bx, dns_bx[1], sep=""))
+sys_names_fx <- sapply(strsplit(dns_f,"_"),"[",1)
+sys_names_bx <- sapply(strsplit(dns_bx,"_"),"[",1)
+
+###### FOLD DATA ######
+# sys, mut, ddg_exp info saved as foldx, bindx dataframes.
+# read in foldX output values
+col_names_fx <- fns_fx
+col_names_fx <- sub("ddg_0_","",col_names_fx)
+col_names_fx <- sub("[.]dat","",col_names_fx)
+list_vals <- list()
+for (i in 1:length(col_names_fx)){
+  vals_i <- list()
+  for (j in 1:length(dns_fx)){
+    vals_i[[j]] <- read.table(paste(path_fx,dns_fx[j],"/",fns_fx[i],sep=""))[1]
+  }
+  list_vals[[col_names_fx[i]]] <- unlist(vals_i)
+}
+df_vals_fx <- as.data.frame(list_vals) # convert list of values as df for cleanup
+# rows 676-702 are duplicates of 27 rows of 2abd. Delete these rows.
+df_vals_fx <- df_vals_fx[1:675,]
+# Combine into a single df
+foldx <- cbind(foldx, df_vals_fx)
+# Add "error" columne
+foldx$error <- abs(foldx$total-foldx$ddg_exp)
+
+# Remove energy terms that have only zeroes:
+zeroes_fx <- vector()
+for (i in 3:length(colnames(foldx))){
+  if (sum(foldx[,i])==0){
+    zeroes_fx <- c(zeroes_fx, i)
+  }
+}
+foldx <- foldx[-zeroes_fx]
+
+####### BIND DATA ######
+col_names_bx <- fns_bx
+col_names_bx <- sub("ddg_000_","",col_names_bx)
+col_names_bx <- sub("[.]dat","",col_names_bx)
+list_vals <- list()
+for (i in 1:length(col_names_bx)){
+  vals_i <- list()
+  for (j in 1:length(dns_bx)){
+    vals_i[[j]] <- read.table(paste(path_bx,dns_bx[j],"/",fns_bx[i],sep=""))[1]
+  }
+  list_vals[[col_names_bx[i]]] <- unlist(vals_i)
+}
+# Combine into a single df
+bindx <- cbind(bindx, as.data.frame(list_vals))
+# Add "error" columne
+bindx$error <- abs(bindx$total-bindx$ddg_exp)
+
+# Remove energy terms that have only zeroes:
+zeroes_bx <- vector()
+for (i in 3:length(colnames(bindx))){
+  if (sum(bindx[,i])==0){
+    zeroes_bx <- c(zeroes_bx, i)
+  }
+}
+bindx <- bindx[-zeroes_bx]
+
+# Remove columns that will not be in the model search:
+omit_fx <- which(names(foldx) %in% c("ddg_exp","systems","mut"))
+omit_bx <- which(names(bindx) %in% c("ddg_exp","systems","mut"))
+foldx_tr <- foldx[-omit_fx]
+bindx_tr <- bindx[-omit_bx]
+```
+
+
+
+## Calculate and add other amino acid characteristics
+
+Put reference values for VDW volumes, pK, hydrophobicity index, and charge in a named list. This will be looked up in calculating changes of these values in each mutation in dataset.
+```{r}
+# AA and their properties (ref: textbook, Sigma Aldrich reference chart)
+AAs <- c("A","R","N","D","C","Q","E","G","H","I","L","K","M","F","P","S","T","W","Y","V")
+# vdw volume in angstrom^3
+vdw <- c(88.6,173.4,114.1,111.1,108.5,143.8,138.4,60.1,153.2,166.7,166.7,168.6,162.9,189.9,112.7,89.0,116.1,227.8,193.6,140.0)
+pK <- c(NA,12.48,NA,3.65,8.18,NA,4.25,NA,6,NA,NA,10.53,NA,NA,NA,NA,NA,NA,NA,NA) # pK of charged groups
+HI <- c(41,-14,-28,-55,49,-10,-31,0,8,99,97,-23,74,100,-46,-5,13,97,63,76) # Pro: at pH2 
+charge <- c(0,1,0,-1,0,0,-1,0,1,0,0,1,0,0,0,0,0,0,0,0) # plain electrical charge
+listAA <- list(vdw, pK, HI, charge)
+for (i in 1:length(listAA)){
+  names(listAA[[i]]) <- AAs
+}
+names(listAA) <- c("vdw", "pK", "HI", "charge")
+
+# Create new columns for AA change information for characteristics such as changes in VDW volumne, charge, etc.
+# Separate out AA changes:
+fold$AAfrom <- sapply(as.character(fold$mut), function(x) strsplit(x, "")[[1]][1])
+fold$AAto <- sapply(as.character(fold$mut), function(x) strsplit(x, "")[[1]][length(strsplit(x, "")[[1]])])
+fold$chain <- sapply(as.character(fold$mut), function(x) strsplit(x, "")[[1]][2])
+fold$residue <- gsub('\\D', '', fold$mut)
+fold$ch_res <- paste(fold$chain, fold$residue, sep = "") # for matching with dssp rows later
+
+bind$AAfrom <- sapply(as.character(bind$mut), function(x) strsplit(x, "")[[1]][1])
+bind$AAto <- sapply(as.character(bind$mut), function(x) strsplit(x, "")[[1]][length(strsplit(x, "")[[1]])])
+bind$chain <- sapply(as.character(bind$mut), function(x) strsplit(x, "")[[1]][2])
+bind$residue <- gsub('\\D', '', bind$mut)
+bind$ch_res <- paste(bind$chain, bind$residue, sep = "")
+
+
+# Mutations to or from proline
+fold$P <- ifelse(fold$AAfrom == "P" & fold$AAto != "P", 1, 
+                     ifelse(fold$AAfrom != "P" & fold$AAto == "P", 1, 0))
+bind$P <- ifelse(bind$AAfrom == "P" & bind$AAto != "P", 1, 
+                     ifelse(bind$AAfrom != "P" & bind$AAto == "P", 1, 0))
+# Size change (using vdw volume)
+fold$volchange <- abs(listAA$vdw[fold$AAto] - listAA$vdw[fold$AAfrom])
+bind$volchange <- abs(listAA$vdw[bind$AAto] - listAA$vdw[bind$AAfrom])
+# Hydrophobicity change
+fold$HIchange <- abs(listAA$HI[fold$AAto] - listAA$HI[fold$AAfrom])
+bind$HIchange <- abs(listAA$HI[bind$AAto] - listAA$HI[bind$AAfrom])
+# Charge change
+fold$charge <- abs(listAA$charge[fold$AAto] - listAA$charge[fold$AAfrom])
+bind$charge <- abs(listAA$charge[bind$AAto] - listAA$charge[bind$AAfrom])
+```
+
+
+
+Secondary structure info was obtained by running DSSP (DSSP usage: https://swift.cmbi.umcn.nl/gv/dssp/DSSP_3.html). 
+
+For Relative Solven Accessibility (RSA) calculation, we take ASA values from DSSP output and use methods described in: Tien MZ, Meyer AG, Sydykova DK et al. Maximum Allowed Solvent Accessibilites of Residues in Proteins. PLOS ONE 2013;8:e80635
+
+DSSP output files have been modified in Excel to cut header and separate out columns before saving as CSV files that will be read in below.
+
+```{r}
+# FOLD
+# Read in each dssp files into a list of dataframes
+dssps_f <- list()
+for (i in 1:length(sys_names_f)) {
+  dssps_f[[i]] <- read.csv(paste("../data/dssp/fold/sys",
+                                 sys_names_f[i], ".dssp.csv", sep = ""))
+  dssps_f[[i]]$ch_res <- paste(dssps_f[[i]]$CHAIN, dssps_f[[i]]$RESIDUE, sep = "") 
+  dssps_f[[i]]$STR <- sapply(dssps_f[[i]]$STR, as.character) # without it, reads as factor
+}
+names(dssps_f) <- sys_names_f
+# Match each mut to DSSP entry and add ACC and sec str info to the master df
+for (r in 1:nrow(fold)){
+  dssp_tmp <- dssps_f[[fold$systems[r]]]
+  chres_tmp <- fold$ch_res[r]
+  if (chres_tmp %in% dssp_tmp$ch_res){
+    fold$str[r] <- dssp_tmp[which(dssp_tmp$ch_res==chres_tmp),]$STR
+    fold$ACC[r] <- dssp_tmp[which(dssp_tmp$ch_res==chres_tmp),]$ACC
+  } else {
+    print(paste("(fold) no match for:", fold$systems[r], fold$ch_res[r], 
+                "- Will remove row", r, sep = " "))
+    fold$str[r] <- NA
+    fold$ACC[r] <- NA
+  }
+}
+# Remove "no match" entries from master df (gets error later on otherwise) (there are only 3)
+fold <- na.omit(fold)
+
+# BIND
+# Read in each dssp files into a list of data frames
+dssps_b <- list()
+for (i in 1:length(sys_names_b)) {
+  dssps_b[[i]] <- read.csv(paste("../data/dssp/bind/sys",
+                                 sys_names_b[i], ".dssp.csv", sep = ""))
+  dssps_b[[i]]$ch_res <- paste(dssps_b[[i]]$CHAIN, dssps_b[[i]]$RESIDUE, sep = "")
+  dssps_b[[i]]$STR <- sapply(dssps_b[[i]]$STR, as.character)
+}
+names(dssps_b) <- sys_names_b
+# Match each mut to DSSP entry and add ACC and sec str info to the master df
+for (r in 1:nrow(bind)){
+  dssp_tmp <- dssps_b[[bind$systems[r]]]
+  chres_tmp <- bind$ch_res[r]
+  if (chres_tmp %in% dssp_tmp$ch_res){
+    bind$str[r] <- dssp_tmp[which(dssp_tmp$ch_res==chres_tmp),]$STR
+    bind$ACC[r] <- dssp_tmp[which(dssp_tmp$ch_res==chres_tmp),]$ACC
+  } else {
+    print(paste("(bind) no match for:", bind$systems[r], bind$ch_res[r],
+                "- Will remove row", r, sep = " "))
+    bind$str[r] <- NA
+    bind$ACC[r] <- NA
+  }
+}
+bind <- na.omit(bind)
+
+# RSA calculation
+# Table S1 values (Tien et al)
+# Recommended (ALLOWED category) maximum SA values - do empirical values
+max_emp <- c(121,265,187,187,148,214,214,97,216,195,191,230,203,228,154,143,163,264,255,166)
+names(max_emp) <- AAs
+fold$RSA <- fold$ACC/max_emp[fold$AAfrom]
+bind$RSA <- bind$ACC/max_emp[bind$AAfrom]
+fold$str[fold$str==""] <- "NONE"
+bind$str[bind$str==""] <- "NONE"
+fold$str <- as.factor(fold$str)
+bind$str <- as.factor(bind$str)
+```
+
+Remove columns that will not be in the model search:
+```{r}
+omit_f <- which(names(fold) %in% c("ddg_exp","systems","mut","AAfrom","AAto","chain","residue","ch_res","ACC"))
+omit_b <- which(names(bind) %in% c("ddg_exp","systems","mut","AAfrom","AAto","chain","residue","ch_res","ACC"))
+fold_tr <- fold[-omit_f]
+bind_tr <- bind[-omit_b]
+```
+
+
+
+
+
+After running above codes, dataframes we get are:
+- foldx/bindx: FoldX-only values with system, mut, ddg_exp info
+- foldx_tr/bindx_tr: systems, mut, ddg_exp removed from above. Use for model training
+- fold/bind: FoldX values + sd (from MD sim) + other info (RSA, structure, etc)
+- fold_tr/bind_tr: Use for model training
+
+
+Save dataframes in outputs/
+```{r}
+write.csv(foldx, "../outputs/table_fxonly_f.csv", row.names = F)
+write.csv(bindx, "../outputs/table_fxonly_b.csv", row.names = F)
+write.csv(foldx_tr, "../outputs/tr_table_fxonly_f.csv", row.names = F)
+write.csv(bindx_tr, "../outputs/tr_table_fxonly_b.csv", row.names = F)
+
+write.csv(fold, "../outputs/table_full_f.csv", row.names = F)
+write.csv(bind, "../outputs/table_full_b.csv", row.names = F)
+write.csv(fold_tr, "../outputs/tr_table_full_f.csv", row.names = F)
+write.csv(bind_tr, "../outputs/tr_table_full_b.csv", row.names = F)
+```
+
+
+
+
+
+

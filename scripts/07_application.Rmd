@@ -1,0 +1,274 @@
+---
+title: "Application"
+author: "Yesol Sapozhnikov"
+date: "2023-04-19"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+## Description
+
+Use this notebook to obtain uncertainty associated with FoldX-calculated ddG, i.e. the upper bound of the prediction interval around predicted error (see manuscript for details).
+
+How to use:
+1. Choose the appropriate model
+2. Edit the input dataframe: replace the values for each column. Do not change the column names as they are the coefficient names in the lm object representing the model.
+3. Run the chunk which will output the upper bound of the prediction interval.
+
+
+## Model 1 for folding energy
+
+Use this model for ddG calculated from a single experimental structure. Expected input data are ddG values for each of these FoldX terms: energy_vdw, energy_vdwclash, entropy_sidec, sideHbond, total.
+
+```{r}
+# Create the input data. Replace the simulated values with your own data
+dat <- data.frame(
+  energy_vdw = rnorm(3, 1, 1),
+  energy_vdwclash = rnorm(3, 1, 1),
+  entropy_sidec = rnorm(3, 1, 1),
+  sideHbond = rnorm(3, 1, 1),
+  total = rnorm(3, 1, 1)
+)
+# Read in the model object
+mod1_fold <- readRDS("../outputs/best_mods_all.rds")$mod1_fold
+# Predict and output the uncertainty
+predict(mod1_fold, newdata = dat, interval = "prediction")[,"upr"]
+```
+
+
+## Model 1 for binding energy
+
+Use this model for ddG calculated from a single experimental structure. Expected input data are ddG values for each of these FoldX terms: energy_ionisation, energy_solvh, energy_vdw, energy_vdwclash, entropy_sidec.
+```{r}
+# Create the input data. Replace the simulated values with your own data
+dat <- data.frame(
+  energy_ionisation = rnorm(3, 1, 1),
+  energy_solvh = rnorm(3, 1, 1),
+  energy_vdw = rnorm(3, 1, 1),
+  energy_vdwclash = rnorm(3, 1, 1),
+  entropy_sidec = rnorm(3, 1, 1)
+)
+# Read in the model object
+mod1_bind <- readRDS("../outputs/best_mods_all.rds")$mod1_bind
+# Predict and output the uncertainty
+predict(mod1_bind, newdata = dat, interval = "prediction")[,"upr"]
+```
+
+
+## Model 2 for folding energy
+
+Use this model for ddG calculated from a single experimental structure. 
+Expected input data are:
+- ddG values for each of these FoldX terms: energy_vdw, energy_vdwclash, entropy_sidec, sideHbond, total
+- Mutation to/from proline (0 for false, 1 for true)
+- Secondary structure according to DSSP ("B", "E", "G", "H", "NONE", "S", "T")
+- RSA calcuated as described in the manuscript and 01_generate-organized-tables.Rmd, using a method from Tien et al.
+
+```{r}
+# Create the input data. Replace the simulated values with your own data
+dat <- data.frame(
+  energy_vdw = rnorm(3, 1, 1),
+  energy_vdwclash = rnorm(3, 1, 1),
+  entropy_sidec = rnorm(3, 1, 1),
+  sideHbond = rnorm(3, 1, 1),
+  total = rnorm(3, 1, 1),
+  P = c(0, 0, 1),
+  str = c("B", "E", "H"),
+  RSA = c(.2, .2, .8)
+)
+# Read in the model object
+mod2_fold <- readRDS("../outputs/best_mods_all.rds")$mod2_fold
+# Predict and output the uncertainty
+predict(mod2_fold, newdata = dat, interval = "prediction")[,"upr"]
+```
+
+
+## Model 2 for binding energy
+
+Use this model for ddG calculated from a single experimental structure. 
+Expected input data are:
+- ddG values for each of these FoldX terms: electro, energy_solvh, energy_vdw, energy_vdwclash, entropy_sidec
+- Mutation to/from proline (0 for false, 1 for true)
+- Secondary structure according to DSSP ("B", "E", "G", "H", "NONE", "S", "T")
+- RSA calcuated as described in the manuscript and 01_generate-organized-tables.Rmd, using a method from Tien et al.
+- charge changes (absolute value of the difference between the charge of wildtype AA and the charge of the mutated AA, can be 0, 1, or 2)
+
+```{r}
+# Create the input data. Replace the simulated values with your own data
+dat <- data.frame(
+  electro = rnorm(3, 1, 1),
+  energy_solvh = rnorm(3, 1, 1),
+  energy_vdw = rnorm(3, 1, 1),
+  energy_vdwclash = rnorm(3, 1, 1),
+  entropy_sidec = rnorm(3, 1, 1),
+  P = c(0, 0, 1),
+  str = c("B", "E", "H"),
+  RSA = c(.2, .2, .8),
+  charge = c(0, 1, 2)
+)
+# Read in the model object
+mod2_bind <- readRDS("../outputs/best_mods_all.rds")$mod2_bind
+# Predict and output the uncertainty
+predict(mod2_bind, newdata = dat, interval = "prediction")[,"upr"]
+```
+
+
+## Model 3 for folding energy
+
+Use this model for average ddG from MD + FoldX workflow.
+Expected input data are averaged ddG values for each of these FoldX terms: energy_solvh, energy_vdw, energy_vdwclash, entropy_mainc, entropy_sidec, total
+
+```{r}
+# Create the input data. Replace the simulated values with your own data
+dat <- data.frame(
+  energy_solvh = rnorm(3, 1, 1),
+  energy_vdw = rnorm(3, 1, 1),
+  energy_vdwclash = rnorm(3, 1, 1),
+  entropy_mainc = rnorm(3, 1, 1),
+  entropy_sidec = rnorm(3, 1, 1),
+  total = rnorm(3, 1, 1)
+)
+# Read in the model object
+mod3_fold <- readRDS("../outputs/best_mods_all.rds")$mod3_fold
+# Predict and output the uncertainty
+predict(mod3_fold, newdata = dat, interval = "prediction")[,"upr"]
+```
+
+
+## Model 3 for binding energy
+
+Use this model for average ddG from MD + FoldX workflow.
+Expected input data are averaged ddG values for each of these FoldX terms: energy_vdw, energy_vdwclash, entropy_sidec, sideHbond.
+
+```{r}
+# Create the input data. Replace the simulated values with your own data
+dat <- data.frame(
+  energy_vdw = rnorm(3, 1, 1),
+  energy_vdwclash = rnorm(3, 1, 1),
+  entropy_sidec = rnorm(3, 1, 1),
+  sideHbond = rnorm(3, 1, 1)
+)
+# Read in the model object
+mod3_bind <- readRDS("../outputs/best_mods_all.rds")$mod3_bind
+# Predict and output the uncertainty
+predict(mod3_bind, newdata = dat, interval = "prediction")[,"upr"]
+```
+
+
+## Model 4 for folding energy
+
+Use this model for average ddG from MD + FoldX workflow.
+Expected input data are:
+- Averaged ddG values for each of these FoldX terms: energy_solvh, energy_vdw, energy_vdwclash, entropy_mainc, entropy_sidec, total
+- Mutation to/from proline (0 for false, 1 for true)
+- Secondary structure according to DSSP ("B", "E", "G", "H", "NONE", "S", "T")
+
+```{r}
+# Create the input data. Replace the simulated values with your own data
+dat <- data.frame(
+  energy_solvh = rnorm(3, 1, 1),
+  energy_vdw = rnorm(3, 1, 1),
+  energy_vdwclash = rnorm(3, 1, 1),
+  entropy_mainc = rnorm(3, 1, 1),
+  entropy_sidec = rnorm(3, 1, 1),
+  total = rnorm(3, 1, 1),
+  P = c(0, 0, 1),
+  str = c("B", "E", "H")
+)
+# Read in the model object
+mod4_fold <- readRDS("../outputs/best_mods_all.rds")$mod4_fold
+# Predict and output the uncertainty
+predict(mod4_fold, newdata = dat, interval = "prediction")[,"upr"]
+```
+
+
+## Model 4 for binding energy
+
+Use this model for average ddG from MD + FoldX workflow.
+Expected input data are:
+- Averaged ddG values for each of these FoldX terms: energy_vdw, energy_vdwclash, entropy_sidec
+- Mutation to/from proline (0 for false, 1 for true)
+- Secondary structure according to DSSP ("B", "E", "G", "H", "NONE", "S", "T")
+- RSA calcuated as described in the manuscript and 01_generate-organized-tables.Rmd, using a method from Tien et al.
+- charge changes (absolute value of the difference between the charge of wildtype AA and the charge of the mutated AA, can be 0, 1, or 2)
+
+```{r}
+# Create the input data. Replace the simulated values with your own data
+dat <- data.frame(
+  energy_vdw = rnorm(3, 1, 1),
+  energy_vdwclash = rnorm(3, 1, 1),
+  entropy_sidec = rnorm(3, 1, 1),
+  P = c(0, 0, 1),
+  str = c("B", "E", "H"),
+  RSA = c(.2, .2, .8),
+  charge = c(0, 1, 2)
+)
+# Read in the model object
+mod4_bind <- readRDS("../outputs/best_mods_all.rds")$mod4_bind
+# Predict and output the uncertainty
+predict(mod4_bind, newdata = dat, interval = "prediction")[,"upr"]
+```
+
+
+## Model 5 for folding energy
+
+Use this model for average ddG from MD + FoldX workflow.
+Expected input data are:
+- Averaged ddG values for each of these FoldX terms: energy_vdw, energy_vdwclash, entropy_sidec
+- Standard deviation of the averaged ddG for total (named "total_sd")
+- Mutation to/from proline (0 for false, 1 for true)
+- Secondary structure according to DSSP ("B", "E", "G", "H", "NONE", "S", "T")
+
+```{r}
+# Create the input data. Replace the simulated values with your own data
+dat <- data.frame(
+  energy_vdw = rnorm(3, 1, 1),
+  energy_vdwclash = rnorm(3, 1, 1),
+  entropy_mainc = rnorm(3, 1, 1),
+  entropy_sidec = rnorm(3, 1, 1),
+  total_sd = rnorm(3, 0, 1),
+  P = c(0, 0, 1),
+  str = c("B", "E", "H")
+)
+# Read in the model object
+mod5_fold <- readRDS("../outputs/best_mods_all.rds")$mod5_fold
+# Predict and output the uncertainty
+predict(mod5_fold, newdata = dat, interval = "prediction")[,"upr"]
+```
+
+
+## Model 5 for binding energy
+
+Use this model for average ddG from MD + FoldX workflow.
+Expected input data are:
+- Averaged ddG values for each of these FoldX term, energy_vdw
+- Standard deviation of the averaged ddG terms: backbone_vdwclash, energy_vdwclash, entropy_sidec, total
+- Secondary structure according to DSSP ("B", "E", "G", "H", "NONE", "S", "T")
+- RSA calcuated as described in the manuscript and 01_generate-organized-tables.Rmd, using a method from Tien et al.
+
+```{r}
+# Create the input data. Replace the simulated values with your own data
+dat <- data.frame(
+  energy_vdwclash = rnorm(3, 1, 1),
+  backbone_vdwclash_sd = rnorm(3, 0, 1),
+  energy_vdwclash_sd = rnorm(3, 0, 1),
+  entropy_sidec_sd = rnorm(3, 0, 1),
+  total_sd = rnorm(3, 0, 1),
+  str = c("B", "E", "H"),
+  RSA = c(.2, .2, .8)
+)
+# Read in the model object
+mod5_bind <- readRDS("../outputs/best_mods_all.rds")$mod5_bind
+# Predict and output the uncertainty
+predict(mod5_bind, newdata = dat, interval = "prediction")[,"upr"]
+```
+
+
+
+
+
+
+

@@ -1,0 +1,381 @@
+---
+title: "Figures"
+author: "Yesol Sapozhnikov"
+date: '2022-06-09'
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+## Get data frames for plotting
+
+Load libraries and build data frames for plots.
+```{r}
+library(tidyverse)
+library(ggpubr)
+library(ggpattern)
+#library(ggExtra)
+
+# Full tables:
+fold <- read.csv("../outputs/table_full_f.csv")
+bind <- read.csv("../outputs/table_full_b.csv")
+# FoldX-only tables:
+foldx <- read.csv("../outputs/table_fxonly_f.csv")
+bindx <- read.csv("../outputs/table_fxonly_b.csv")
+# selected models from stepwise & best subset selection
+mods <- readRDS("../outputs/models.rds")
+# source LOsysOCV function
+source("../scripts/functions.R")
+
+# Run LOOCV to create dataframes
+loo_fold <- loocv(formula(mods$mod_subset_f), fold)$df
+loo_bind <- loocv(formula(mods$mod_subset_b), bind)$df
+```
+
+## Table: System-by-system breakdown
+
+```{r}
+loo_fold %>% group_by(systems) %>%
+  summarise(n = n(),
+            median_error = median(error),
+            coverage = round(mean(test),2),
+            width = median(upr))
+```
+
+```{r}
+loo_bind %>% group_by(systems) %>%
+  summarise(n = n(),
+            median_error = median(error),
+            coverage = round(mean(test),2),
+            width = median(upr))
+```
+
+
+## Prediction interval plot with "misses"
+
+Overall plots
+```{r}
+errors_all_fold <- loo_fold %>% arrange(upr) %>%
+  ggplot(aes(x = seq_along(error), y = error)) +
+  geom_point(aes(color = test)) +
+  geom_line(aes(x = seq_along(error), y = upr, color = "upper bound")) +
+  scale_color_manual(values = c("red", "black", "blue"),
+                     labels = c("error above bound", "error within bound","predicted upper bound"),
+                     guide = guide_legend(override.aes = list(
+                       linetype = c("blank","blank","solid"),
+                       shape = c(16,16,NA)
+                     ))) +  
+  theme_light() +
+  scale_x_continuous(NULL, breaks = NULL) +
+  labs(y = "error (kcal/mol)") +
+  annotate("text", x = 100, y = 12.5, label = "Fold data", size = 8) +
+  theme(legend.position = c(0.7,0.8), legend.title = element_blank())
+errors_all_bind <- loo_bind %>% arrange(upr) %>%
+  ggplot(aes(x = seq_along(error), y = error)) +
+  geom_point(aes(color = test)) +
+  geom_line(aes(x = seq_along(error), y = upr, color = "upper bound")) +
+  scale_color_manual(values = c("red", "black", "blue"),
+                     labels = c("error above bound", "error within bound","predicted upper bound"),
+                     guide = guide_legend(override.aes = list(
+                       linetype = c("blank","blank","solid"),
+                       shape = c(16,16,NA)
+                     ))) +  
+  theme_light() +
+  scale_x_continuous(NULL, breaks = NULL) +
+  labs(y = "error (kcal/mol)") +
+  annotate("text", x = 90, y = 15.7, label = "Bind data", size = 8) +
+  theme(legend.position = c(0.7,0.8), legend.title = element_blank())
+```
+
+Breakdown by system
+```{r}
+errors_sys_fold <- loo_fold %>% arrange(upr) %>%
+  ggplot(aes(y=error,x=seq_along(error))) +
+  geom_point(aes(color=test), size = .8, show.legend = FALSE) +
+  geom_line(aes(x=seq_along(error), y=upr), color="blue") +
+  scale_color_manual(values = c("#FF0000", "#000000")) +
+  facet_wrap(~systems, nrow = 2) +
+  theme_bw() + labs(y = "error (kcal/mol)") +
+  theme(axis.title.x = element_blank(), axis.text.x = element_blank(), axis.ticks.x = element_blank(),
+        panel.grid.major = element_blank(), panel.grid.minor = element_blank(),
+        strip.background = element_rect(fill = "white"))
+errors_sys_bind <- loo_bind %>% arrange(upr) %>% 
+  ggplot(aes(y=error,x=seq_along(error))) +
+  geom_point(aes(color=test), size = .8, show.legend = FALSE) +
+  geom_line(aes(x=seq_along(error), y=upr), color="blue") +
+  scale_color_manual(values = c("#FF0000", "#000000")) +
+  theme_bw() + labs(y = "error (kcal/mol)") +
+  facet_wrap(~systems, nrow = 2) +
+  theme(axis.title.x = element_blank(), axis.text.x = element_blank(), axis.ticks.x = element_blank(),
+        panel.grid.major = element_blank(), panel.grid.minor = element_blank(),
+        strip.background = element_rect(fill = "white"))
+```
+
+Arragne plots
+```{r}
+ggarrange(errors_all_fold, errors_sys_fold, errors_all_bind, errors_sys_bind,
+          labels = c("A","B","C","D"),
+          ncol = 2, nrow = 2)
+ggsave("../figures/errors_sorted.png", width = 11, height = 9)
+```
+
+
+
+
+
+
+
+## Visualizing classification error
+
+```{r}
+binned_fold <- loo_fold %>% 
+  select(systems, mut, ddg_exp, total, error, upr, test) %>%
+  rename(ddg_pred = total) %>%
+  mutate(classes_pred = cut(ddg_pred, c(-Inf, -.5, .5, Inf),
+                           labels = c("stabilizing", "neutral", "destabilizing")),
+         classes_actual = cut(ddg_exp, c(-Inf, -.5, .5, Inf),
+                           labels = c("stabilizing", "neutral", "destabilizing")))
+binned_fold$ddg_pred_cat <- cut(binned_fold$ddg_pred, breaks = c(-Inf, -1.5, -.5, .5, 1.5, 2.5, 4, 5.5, 10, Inf))
+binned_fold$bincode <- NA # to be filled with below loop
+binned_fold$class_match <- NA
+binned_fold$dataset <- "fold"
+
+binned_bind <- loo_bind %>% 
+  select(systems, mut, ddg_exp, total, error, upr, test) %>%
+  rename(ddg_pred = total) %>%
+  mutate(classes_pred = cut(ddg_pred, c(-Inf, -.5, .5, Inf),
+                           labels = c("stabilizing", "neutral", "destabilizing")),
+         classes_actual = cut(ddg_exp, c(-Inf, -.5, .5, Inf),
+                           labels = c("stabilizing", "neutral", "destabilizing")))
+binned_bind$ddg_pred_cat <- cut(binned_bind$ddg_pred, breaks = c(-1.5, -.5, .5, 1.5, 2.5, 4, 5.5, 10, Inf))
+
+binned_bind$bincode <- NA # to be filled with below loop
+binned_bind$class_match <- NA
+binned_bind$dataset <- "bind"
+
+# Create 3-digit code to classify with uncertainty
+create_bincode <- function(ddg, upr){
+  L <- ddg - upr
+  U <- ddg + upr
+  if (L < -0.5 & U > 0.5){
+      bincode <- "111" #any
+    } else if (L > -0.5 & U < 0.5){
+      bincode <- "010" #neutral
+    } else if (U < -0.5){
+      bincode <- "100" #stabilizing
+    } else if (L > 0.5){
+      bincode <- "001" #destabilizing
+    } else if (U < 0.5){
+      bincode <- "110" #neutral or stabilizing
+    } else if (L > -0.5){
+      bincode <- "011" #neutral or destabilizing
+    }
+  return(bincode)
+}
+
+for (i in 1:nrow(binned_fold)){ 
+  binned_fold$bincode[i] <- create_bincode(binned_fold$ddg_pred[i], binned_fold$upr[i])
+  if (binned_fold$classes_pred[i] == binned_fold$classes_actual[i]){
+    binned_fold$class_match[i] <- "match"
+  } else (binned_fold$class_match[i] <- "mismatch")
+}
+
+for (i in 1:nrow(binned_bind)){
+  binned_bind$bincode[i] <- create_bincode(binned_bind$ddg_pred[i], binned_bind$upr[i])
+  if (binned_bind$classes_pred[i] == binned_bind$classes_actual[i]){
+    binned_bind$class_match[i] <- "match"
+  } else (binned_bind$class_match[i] <- "mismatch")
+}
+
+binned_all <- bind_rows(binned_fold, binned_bind)
+
+# Create bins on ddg_exp
+binned_all$ddg_exp_cat <- cut(binned_all$ddg_exp, breaks = c(-Inf, -1.5, -.5, .5, 1.5, 2.5, 4, 5.5, Inf))
+# redo binning the ddg_pred
+binned_all$ddg_pred_cat <- cut(binned_all$ddg_pred, breaks = c(-Inf, -1.5, -.5, .5, 1.5, 2.5, 4, 5.5, Inf))
+```
+
+
+Histogram to show actual ddG distribution of our dataset:
+```{r}
+actual_hist <-
+binned_all %>% ggplot(aes(x = ddg_exp)) +
+  geom_histogram(aes(fill = classes_actual), color = "black",
+                 breaks = c(-3,-1.5, -0.5, 0.5, 1.5, 2.5, 4, 5.5, 8, 16)) +
+  scale_fill_manual(values = c("lightsteelblue2", "white", "rosybrown2"),
+                    name = "Actual class",
+                    labels = c("stabilizing", "neutral", "destabilizing")) +
+  theme_classic() +
+  theme(
+        # legend.position = c(.87, .5),
+        # legend.box.background = element_rect(),
+        legend.title = element_text(size = 14),
+        legend.text = element_text(size = 12),
+        axis.title = element_text(size = 16), axis.text = element_text(size = 12),
+        strip.text = element_text(size = 16)) +
+  labs(x = expression(paste(Delta, Delta, "G")[exp]~(kcal/mol))) +
+  facet_grid(~factor(dataset, levels = c("fold", "bind")))
+actual_hist
+```
+
+
+```{r}
+class1 <- 
+binned_all %>% ggplot(aes(x = ddg_pred)) +
+  geom_histogram_pattern(position = "fill", color = "black",
+                 breaks = c(-3,-1.5, -0.5, 0.5, 1.5, 2.5, 4, 5.5, 8, 16),
+                 pattern_color = "black", pattern_density = 0.01, pattern_spacing = 0.02, pattern_angle = 45,
+                 aes(fill = classes_actual, pattern = class_match)) +
+  scale_fill_manual(values = c("lightsteelblue2", "white", "rosybrown2"),
+                    name = "Actual class",
+                    labels = c("stabilizing", "neutral", "destabilizing"),
+                    guide = guide_legend(override.aes = list(pattern = "none"), order = 1)) +
+  scale_pattern_manual(values = c("none", "stripe"),
+                       name = NULL,
+                       labels = c("correct", "misclassified"),
+                       guide = guide_legend(override.aes = list(fill = "gray"), order = 2)) +
+  theme_classic() +
+  theme(axis.title = element_text(size = 16), axis.text = element_text(size = 12),
+        strip.text = element_text(size = 16),
+        axis.text.y = element_blank(), axis.ticks.y = element_blank(),
+        legend.title = element_text(size = 14),
+        legend.text = element_text(size = 12),
+        # legend.position = c(.88, .5))+
+        # legend.box.background = element_rect()
+        ) +
+  labs(x = expression(paste(Delta, Delta, "G")[FoldX]~(kcal/mol)),
+       y = "proportion") +
+  facet_grid(~factor(dataset, levels = c("fold", "bind")))
+class1
+```
+```{r}
+class2 <- 
+binned_all %>% ggplot(aes(x = ddg_pred)) +
+  geom_histogram(position = "fill", color = "black",
+                 breaks = c(-3,-1.5, -0.5, 0.5, 1.5, 2.5, 4, 5.5, 8, 16),
+                 aes(fill = bincode)) +
+  scale_fill_manual(values = c("red4", "rosybrown2", "lightsteelblue2", "white"),
+                    name = "Possible class",
+                    labels = c("destabilizing", "destabilizing\nor neutral", "stabilizing\nor neutral", "any")) +
+  theme_classic() +
+  theme(axis.title = element_text(size = 16), axis.text = element_text(size = 12),
+        strip.text = element_text(size = 16),
+        axis.text.y = element_blank(), axis.ticks.y = element_blank(),
+        legend.title = element_text(size = 14),
+        legend.text = element_text(size = 12),
+        legend.key.height = unit(1.3, "cm") 
+        # legend.position = c(.42, .5), 
+        # legend.box.background = element_rect()
+        ) +
+  labs(x = expression(paste(Delta, Delta, "G")[FoldX]~(kcal/mol)),
+       y = "proportion") +
+  facet_grid(~factor(dataset, levels = c("fold", "bind")))
+class2
+```
+```{r}
+ggarrange(actual_hist, class1, class2,
+          labels = c("A","B","C"),
+          ncol = 1)
+ggsave("../figures/classifications_separated.png", width = 9, height = 11)
+```
+
+
+
+Resampling
+
+
+```{r}
+bins <- sort(unique(binned_all$ddg_exp_cat))
+N <- 1000 #resample size per bin
+resampled <- NULL # initialize resampled df
+for (i in 1:length(bins)){
+  df_ori <- binned_all %>% filter(ddg_exp_cat == bins[i])
+  n_rows <- nrow(df_ori)
+  sample_rows <- sample(n_rows, N, replace = TRUE)
+  df_resampled <- df_ori[sample_rows,]
+  resampled <- bind_rows(resampled, df_resampled)
+}
+N_min <- min(resampled$ddg_exp) ; N_max <- max(resampled$ddg_exp)
+```
+
+```{r}
+class1_resampled <- 
+resampled %>% ggplot(aes(x = ddg_pred)) +
+  geom_histogram_pattern(position = "fill", color = "black",
+                 breaks = c(-3, -1.5, -0.5, 0.5, 1.5, 2.5, 4, 5.5, 8, 16),
+                 pattern_color = "black", pattern_density = 0.01, pattern_spacing = 0.02, pattern_angle = 45,
+                 aes(fill = classes_actual, pattern = class_match)) +
+  scale_fill_manual(values = c("lightsteelblue2", "white", "rosybrown2"),
+                    name = "Actual class",
+                    labels = c("stabilizing", "neutral", "destabilizing"),
+                    guide = guide_legend(override.aes = list(pattern = "none"), order = 1)) +
+  scale_pattern_manual(values = c("none", "stripe"),
+                       name = NULL,
+                       labels = c("correct", "misclassified"),
+                       guide = guide_legend(override.aes = list(fill = "gray"), order = 2)) +
+  theme_classic() +
+  theme(axis.title = element_text(size = 16), axis.text = element_text(size = 12),
+        strip.text = element_text(size = 16),
+        axis.text.y = element_blank(), axis.ticks.y = element_blank(),
+        legend.title = element_text(size = 14),
+        legend.text = element_text(size = 12)) +
+  labs(x = expression(paste(Delta, Delta, "G")[FoldX]~(kcal/mol)),
+       y = "proportion") +
+  facet_grid(~factor(dataset, levels = c("fold", "bind")))
+class1_resampled
+```
+```{r}
+class2_resampled <- 
+resampled %>% ggplot(aes(x = ddg_pred)) +
+  geom_histogram(position = "fill", color = "black",
+                 breaks = c(-3,-1.5, -0.5, 0.5, 1.5, 2.5, 4, 5.5, 8, 16),
+                 aes(fill = bincode)) +
+  scale_fill_manual(values = c("red4", "rosybrown2", "lightsteelblue2", "white"),
+                    name = "Possible class",
+                    labels = c("destabilizing", "destabilizing\nor neutral", "stabilizing\nor neutral", "any")) +
+  theme_classic() +
+  theme(axis.title = element_text(size = 16), axis.text = element_text(size = 12),
+        strip.text = element_text(size = 16),
+        axis.text.y = element_blank(), axis.ticks.y = element_blank(),
+        legend.title = element_text(size = 14),
+        legend.text = element_text(size = 12),
+        legend.key.height = unit(1.3, "cm") ) +
+  labs(x = expression(paste(Delta, Delta, "G")[FoldX]~(kcal/mol)),
+       y = "proportion") +
+  facet_grid(~factor(dataset, levels = c("fold", "bind")))
+class2_resampled
+```
+
+```{r}
+ggarrange(class1_resampled, class2_resampled,
+          labels = c("A","B"),
+          ncol = 1)
+ggsave("../figures/classifications_resampled.png", width = 9, height = 7.5)
+```
+
+
+
+
+Chi-sq test for system-by-system errors
+```{r}
+tab_fold <- as.data.frame.matrix(table(loo_fold$systems, loo_fold$test))
+chisq.test(tab_fold, simulate.p.value = TRUE)
+```
+
+```{r}
+tab_bind <- as.data.frame.matrix(table(loo_bind$systems, loo_bind$test))
+chisq.test(tab_bind, simulate.p.value = TRUE)
+```
+
+
+
+
+
+
+
+
+
+
+

@@ -1,0 +1,161 @@
+---
+title: "Model Summary"
+author: "Yesol Sapozhnikov"
+date: '2022-06-14'
+output: html_document
+---
+
+<style type="text/css">
+  body{
+  font-size: 10pt;
+}
+</style>
+
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = FALSE)
+```
+
+
+```{r, include = FALSE}
+# load packages
+library(tidyverse)
+
+# Full tables:
+fold <- read.csv("../outputs/table_full_f.csv")
+bind <- read.csv("../outputs/table_full_b.csv")
+
+
+# FoldX-only tables:
+foldx <- read.csv("../outputs/table_fxonly_f.csv")
+bindx <- read.csv("../outputs/table_fxonly_b.csv")
+
+foldx <- foldx[-c(449, 642, 643),]
+
+# selected models from stepwise & best subset selection
+best_mods <- readRDS("../outputs/best_mods_all.rds")
+
+# source LOsysOCV function
+source("../scripts/functions.R")
+```
+
+
+## Model performance comparison
+
+Fold dataset
+```{r, warning=FALSE}
+# Must create separate datasets for mod2 that contains fx-only data plus biochem params.
+mod2_data_f <- fold %>% 
+  select(P, volchange, HIchange, charge, str, RSA) %>%
+  bind_cols(., foldx)
+mod2_data_b <- bind %>%
+  select(P, volchange, HIchange, charge, str, RSA) %>%
+  bind_cols(., bindx)
+datasets_ls <- list(foldx, mod2_data_f, fold, fold, fold, bindx, mod2_data_b, bind, bind, bind)
+sum_table <- data.frame(models = str_split(names(best_mods[1:5]), "_", simplify = T)[,1])
+for (i in 1:5){
+  sum_table$adj_r2[i] <- summary(best_mods[[i]])$adj.r.squared
+  out <- loocv(formula(best_mods[[i]]), datasets_ls[[i]])
+  sum_table$coverage[i] <- out$coverage
+  sum_table$med_upr_bd[i] <- out$med_upr_bd
+}
+sum_table
+```
+
+Bind dataset
+```{r, warning = FALSE}
+sum_table <- data.frame(models = str_split(names(best_mods[6:10]), "_", simplify = T)[,1])
+for (i in 6:10){
+  sum_table$adj_r2[i-5] <- summary(best_mods[[i]])$adj.r.squared
+  out <- loocv(formula(best_mods[[i]]), datasets_ls[[i]])
+  sum_table$coverage[i-5] <- out$coverage
+  sum_table$med_upr_bd[i-5] <- out$med_upr_bd
+}
+sum_table
+```
+
+## Model details: Fold
+
+### Model 5 (MD+FX dataset with all predictors)
+
+```{r}
+summary(best_mods$mod5_fold)
+```
+
+### Model 4 (MD+FX dataset with energy terms and biochemical properties)
+
+```{r}
+summary(best_mods$mod4_fold)
+```
+
+### Model 3 (MD+FX dataset with energy terms only)
+
+```{r}
+summary(best_mods$mod3_fold)
+```
+
+### Model 2 (FX dataset with energy terms and biochemical properties)
+
+```{r}
+summary(best_mods$mod2_fold)
+```
+
+### Model 1 (FX dataset with energy terms only)
+
+```{r}
+summary(best_mods$mod1_fold)
+```
+
+
+## Model details: Bind
+
+### Model 5 (MD+FX dataset with all predictors)
+
+```{r}
+summary(best_mods$mod5_bind)
+```
+
+### Model 4 (MD+FX dataset with energy terms and biochemical properties)
+
+```{r}
+summary(best_mods$mod4_bind)
+```
+
+### Model 3 (MD+FX dataset with energy terms only)
+
+```{r}
+summary(best_mods$mod3_bind)
+```
+
+### Model 2 (FX dataset with energy terms and biochemical properties)
+
+```{r}
+summary(best_mods$mod2_bind)
+```
+
+### Model 1 (FX dataset with energy terms only)
+
+```{r}
+summary(best_mods$mod1_bind)
+```
+
+# Compare BIC
+
+```{r}
+bics <- sapply(best_mods, BIC)
+bic_df <- data.frame(model = str_sub(names(bics), 1, 4),
+                     bic = round(bics),
+                     energy = str_sub(names(bics), 6, 9))
+bic_df %>%
+  ggplot(aes(x = model, y = bic, color = energy, group = energy)) +
+  geom_point() +
+  geom_line() +
+  geom_text(aes(label = bic), vjust = 2, color = "black") +
+  scale_color_manual(values = c("red", "steelblue")) +
+  theme_bw()
+ggsave("../figures/BIC_comparison.png")
+```
+
+
+
+
