@@ -2,9 +2,9 @@
 
 ## Overview
 
-This repo contains the code and datasets used in the manuscript, "Statistical Modeling to Quantify the Uncertainty of FoldX-Predicted Protein Folding and Binding Stability" by Sapozhnikov et al.
+The code and datasets here accompany the manuscript, "Statistical Modeling to Quantify the Uncertainty of FoldX-Predicted Protein Folding and Binding Stability" by Sapozhnikov et al.
 
-In order to run the code, git clone this repository and run the R scripts from where they are (`scripts/` folder). All original datasets as well as intermediate outputs are already present in appropriate folders, and will be simply replaced if you re-run the codes. Some of the model search, especially the best subset selection, may take awhile. Code files are numbered according to the order of analysis.
+All original datasets as well as intermediate outputs are already present in appropriate folders, and will be simply replaced if you re-run the codes. Some of the model search, especially the best subset selection, may take awhile. Code files are numbered according to the order of analysis.
 
 For applying our model to your own data, skip to the file 07_application.Rmd.
 
