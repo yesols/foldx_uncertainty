@@ -1,7 +1,6 @@
 ---
-title: "Model Summary"
+title: "Supplementary Information: Model Summary"
 author: "Yesol Sapozhnikov"
-date: '2022-06-14'
 output: html_document
 ---
 
