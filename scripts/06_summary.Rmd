@@ -139,22 +139,7 @@ summary(best_mods$mod2_bind)
 summary(best_mods$mod1_bind)
 ```
 
-# Compare BIC
 
-```{r}
-bics <- sapply(best_mods, BIC)
-bic_df <- data.frame(model = str_sub(names(bics), 1, 4),
-                     bic = round(bics),
-                     energy = str_sub(names(bics), 6, 9))
-bic_df %>%
-  ggplot(aes(x = model, y = bic, color = energy, group = energy)) +
-  geom_point() +
-  geom_line() +
-  geom_text(aes(label = bic), vjust = 2, color = "black") +
-  scale_color_manual(values = c("red", "steelblue")) +
-  theme_bw()
-ggsave("../figures/BIC_comparison.png")
-```
 
 
 
