@@ -1,5 +1,7 @@
 # foldx_uncertainty
 
+[![DOI](https://zenodo.org/badge/630644739.svg)](https://zenodo.org/badge/latestdoi/630644739)
+
 ## Overview
 
 The code and datasets here accompany the manuscript, "Statistical Modeling to Quantify the Uncertainty of FoldX-Predicted Protein Folding and Binding Stability" by Sapozhnikov et al.
