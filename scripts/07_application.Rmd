@@ -20,7 +20,7 @@ How to use:
 
 Result interpretation:
 `out` is an n x 3 numeric array output by `predict()` function. "fit" is the predicted error, while "lwr" and "upr" are the lower and upper bounds of the prediction interval around the point estimate error. Because of how we defined error, the lower bound is not meaningful. 
-`upr_bound` is a numeric vector, showing just the uppoer bounds of the prediction interval. +/- upr_bound values capture 95% of actual error. Or put another way, FoldX ddG +/- upr_bound would contain the true (experimental) ddG.
+`upr_bound` is a numeric vector, showing just the uppoer bounds of the prediction interval. +/- upr_bound values capture 95% of actual error. Or put another way, FoldX ddG +/- upr_bound would contain the true (experimental) ddG (see figure 2 in the manuscript for graphical illustration).
 
 
 ## Model 1 for folding energy
