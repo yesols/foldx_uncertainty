@@ -15,8 +15,12 @@ Use this notebook to obtain uncertainty associated with FoldX-calculated ddG, i.
 
 How to use:
 1. Choose the appropriate model
-2. Edit the input dataframe: replace the values for each column. Do not change the column names as they are the coefficient names in the lm object representing the model.
-3. Run the chunk which will output the upper bound of the prediction interval.
+2. Edit the input dataframe: replace the values for each column. Do not change the column names as they are the coefficient names in the lm object representing the model. Each row represents values associated with each mutation.
+3. Run the chunk which will output the result.
+
+Result interpretation:
+`out` is an n x 3 numeric array output by `predict()` function. "fit" is the predicted error, while "lwr" and "upr" are the lower and upper bounds of the prediction interval around the point estimate error. Because of how we defined error, the lower bound is not meaningful. 
+`upr_bound` is a numeric vector, showing just the uppoer bounds of the prediction interval. +/- upr_bound values capture 95% of actual error. Or put another way, FoldX ddG +/- upr_bound would contain the true (experimental) ddG.
 
 
 ## Model 1 for folding energy
@@ -34,8 +38,11 @@ dat <- data.frame(
 )
 # Read in the model object
 mod1_fold <- readRDS("../outputs/best_mods_all.rds")$mod1_fold
-# Predict and output the uncertainty
-predict(mod1_fold, newdata = dat, interval = "prediction")[,"upr"]
+# Predict and output the result
+out <- predict(mod1_fold, newdata = dat, interval = "prediction")
+upr_bound <- out[,"upr"]
+print(out)
+cat("upper bounds: ", upr_bound)
 ```
 
 
@@ -53,8 +60,11 @@ dat <- data.frame(
 )
 # Read in the model object
 mod1_bind <- readRDS("../outputs/best_mods_all.rds")$mod1_bind
-# Predict and output the uncertainty
-predict(mod1_bind, newdata = dat, interval = "prediction")[,"upr"]
+# Predict and output the result
+out <- predict(mod1_bind, newdata = dat, interval = "prediction")
+upr_bound <- out[,"upr"]
+print(out)
+cat("upper bounds: ", upr_bound)
 ```
 
 
@@ -81,8 +91,11 @@ dat <- data.frame(
 )
 # Read in the model object
 mod2_fold <- readRDS("../outputs/best_mods_all.rds")$mod2_fold
-# Predict and output the uncertainty
-predict(mod2_fold, newdata = dat, interval = "prediction")[,"upr"]
+# Predict and output the result
+out <- predict(mod2_fold, newdata = dat, interval = "prediction")
+upr_bound <- out[,"upr"]
+print(out)
+cat("upper bounds: ", upr_bound)
 ```
 
 
@@ -111,8 +124,11 @@ dat <- data.frame(
 )
 # Read in the model object
 mod2_bind <- readRDS("../outputs/best_mods_all.rds")$mod2_bind
-# Predict and output the uncertainty
-predict(mod2_bind, newdata = dat, interval = "prediction")[,"upr"]
+# Predict and output the result
+out <- predict(mod2_bind, newdata = dat, interval = "prediction")
+upr_bound <- out[,"upr"]
+print(out)
+cat("upper bounds: ", upr_bound)
 ```
 
 
@@ -133,8 +149,11 @@ dat <- data.frame(
 )
 # Read in the model object
 mod3_fold <- readRDS("../outputs/best_mods_all.rds")$mod3_fold
-# Predict and output the uncertainty
-predict(mod3_fold, newdata = dat, interval = "prediction")[,"upr"]
+# Predict and output the result
+out <- predict(mod3_fold, newdata = dat, interval = "prediction")
+upr_bound <- out[,"upr"]
+print(out)
+cat("upper bounds: ", upr_bound)
 ```
 
 
@@ -153,8 +172,11 @@ dat <- data.frame(
 )
 # Read in the model object
 mod3_bind <- readRDS("../outputs/best_mods_all.rds")$mod3_bind
-# Predict and output the uncertainty
-predict(mod3_bind, newdata = dat, interval = "prediction")[,"upr"]
+# Predict and output the result
+out <- predict(mod3_bind, newdata = dat, interval = "prediction")
+upr_bound <- out[,"upr"]
+print(out)
+cat("upper bounds: ", upr_bound)
 ```
 
 
@@ -180,8 +202,11 @@ dat <- data.frame(
 )
 # Read in the model object
 mod4_fold <- readRDS("../outputs/best_mods_all.rds")$mod4_fold
-# Predict and output the uncertainty
-predict(mod4_fold, newdata = dat, interval = "prediction")[,"upr"]
+# Predict and output the result
+out <- predict(mod4_fold, newdata = dat, interval = "prediction")
+upr_bound <- out[,"upr"]
+print(out)
+cat("upper bounds: ", upr_bound)
 ```
 
 
@@ -208,8 +233,11 @@ dat <- data.frame(
 )
 # Read in the model object
 mod4_bind <- readRDS("../outputs/best_mods_all.rds")$mod4_bind
-# Predict and output the uncertainty
-predict(mod4_bind, newdata = dat, interval = "prediction")[,"upr"]
+# Predict and output the result
+out <- predict(mod4_bind, newdata = dat, interval = "prediction")
+upr_bound <- out[,"upr"]
+print(out)
+cat("upper bounds: ", upr_bound)
 ```
 
 
@@ -235,8 +263,11 @@ dat <- data.frame(
 )
 # Read in the model object
 mod5_fold <- readRDS("../outputs/best_mods_all.rds")$mod5_fold
-# Predict and output the uncertainty
-predict(mod5_fold, newdata = dat, interval = "prediction")[,"upr"]
+# Predict and output the result
+out <- predict(mod5_fold, newdata = dat, interval = "prediction")
+upr_bound <- out[,"upr"]
+print(out)
+cat("upper bounds: ", upr_bound)
 ```
 
 
@@ -262,8 +293,11 @@ dat <- data.frame(
 )
 # Read in the model object
 mod5_bind <- readRDS("../outputs/best_mods_all.rds")$mod5_bind
-# Predict and output the uncertainty
-predict(mod5_bind, newdata = dat, interval = "prediction")[,"upr"]
+# Predict and output the result
+out <- predict(mod5_bind, newdata = dat, interval = "prediction")
+upr_bound <- out[,"upr"]
+print(out)
+cat("upper bounds: ", upr_bound)
 ```
 
 
