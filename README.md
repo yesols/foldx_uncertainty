@@ -1,6 +1,6 @@
 # foldx_uncertainty
 
-[![DOI](https://zenodo.org/badge/630644739.svg)](https://zenodo.org/badge/latestdoi/630644739)
+[![DOI](https://zenodo.org/badge/DOI/10.5281/zenodo.7897628.svg)](https://doi.org/10.5281/zenodo.7897628)
 
 ## Overview
 
